@@ -565,16 +565,22 @@ function v4aEdits(lines: string[], strict: boolean): Edit[] {
       }
       const chunks: VChunk[] = [];
       let cur: VChunk | null = null;
+      // True once `*** End of File` ends the current chunk: a body line then belongs to no chunk
+      // (only a new `@@` line starts one), so it is a parse error rather than part of that chunk.
+      let chunkEnded = false;
       for (const b of rest) {
         if (b.text.startsWith('@@')) {
           cur = { anchor: b.text.slice(2).trim() || null, eof: false, o: [], ops: [] };
           chunks.push(cur);
+          chunkEnded = false;
         } else if (b.text === '*** End of File') {
           if (cur === null) {
             cur = { anchor: null, eof: true, o: [], ops: [] };
             chunks.push(cur);
           } else cur.eof = true;
+          chunkEnded = true;
         } else if (b.text === '' || b.text[0] === ' ' || b.text[0] === '-' || b.text[0] === '+') {
+          if (chunkEnded) throw new Exit2(`error: parse ${b.line}`);
           if (cur === null) {
             if (chunks.length > 0) throw new Exit2(`error: parse ${b.line}`);
             cur = { anchor: null, eof: false, o: [], ops: [] };
